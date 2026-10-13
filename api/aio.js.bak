@@ -1,0 +1,284 @@
+// api/aio.js — handler universal
+// Support: TikTok, Instagram, YouTube, X, Facebook, Pinterest, Spotify,
+// SoundCloud, Threads, CapCut, GDrive, Douyin, Xiaohongshu, SnackVideo, Cocofun, Kuaishou
+
+const lib = require('btch-downloader');
+
+const HANDLERS = {
+  tiktok:      lib.ttdl,
+  instagram:   lib.igdl,
+  youtube:     lib.youtube,
+  twitter:     lib.twitter,
+  facebook:    lib.fbdown,
+  pinterest:   lib.pinterest,
+  spotify:     lib.spotify,
+  soundcloud:  lib.soundcloud,
+  threads:     lib.threads,
+  capcut:      lib.capcut,
+  gdrive:      lib.gdrive,
+  douyin:      lib.douyin,
+  xiaohongshu: lib.xiaohongshu,
+  snackvideo:  lib.snackvideo,
+  cocofun:     lib.cocofun,
+  kuaishou:    lib.kuaishou,
+};
+
+function detectPlatform(input) {
+  if (!input || typeof input !== 'string') return null;
+  let parsed;
+  try {
+    parsed = new URL(input.trim());
+  } catch {
+    return null;
+  }
+  if (!['http:', 'https:'].includes(parsed.protocol)) return null;
+  const host = parsed.hostname.toLowerCase().replace(/^www\./, '');
+  const is = (...domains) => domains.some(d => host === d || host.endsWith('.' + d));
+
+  if (is('tiktok.com')) return 'tiktok';
+  if (is('instagram.com', 'instagr.am')) return 'instagram';
+  if (is('youtube.com', 'youtu.be', 'youtube-nocookie.com')) return 'youtube';
+  if (is('twitter.com', 'x.com')) return 'twitter';
+  if (is('facebook.com', 'fb.watch')) return 'facebook';
+  if (is('pinterest.com', 'pin.it')) return 'pinterest';
+  if (is('spotify.com', 'spotify.link')) return 'spotify';
+  if (is('soundcloud.com', 'on.soundcloud.com')) return 'soundcloud';
+  if (is('threads.com', 'threads.net')) return 'threads';
+  if (is('capcut.com')) return 'capcut';
+  if (is('drive.google.com', 'docs.google.com')) return 'gdrive';
+  if (is('douyin.com')) return 'douyin';
+  if (is('xiaohongshu.com', 'xhslink.com')) return 'xiaohongshu';
+  if (is('snackvideo.com', 'sck.io')) return 'snackvideo';
+  if (is('icocofun.com', 'cocofun.com')) return 'cocofun';
+  if (is('kuaishou.com', 'chenzhongtech.com')) return 'kuaishou';
+  return null;
+}
+
+// ---------- RECURSIVE EXTRACTOR (key-first) ----------
+function extractMedia(obj) {
+  const videos = new Set();
+  const audios = new Set();
+  const images = new Set();
+  const audioKey = /audio|mp3|music|sound|song|track/i;
+  const videoKey = /video|mp4|hdplay|wmplay|playurl|video_url|download_url/i;
+  const imageKey = /image|photo|picture|thumbnail|thumb|cover|poster/i;
+
+  function walk(value, key = '', depth = 0) {
+    if (depth > 14 || value == null) return;
+    if (typeof value === 'string') {
+      if (!/^https?:\/\//i.test(value)) return;
+      let parsed;
+      try { parsed = new URL(value); } catch { return; }
+      const pathAndQuery = `${parsed.pathname}${parsed.search}`.toLowerCase();
+      const keyLower = String(key).toLowerCase();
+
+      if (/\.(mp3|m4a|ogg|wav|aac)(?:$|[?#])/i.test(pathAndQuery) || /[?&](mime|type)=audio/i.test(pathAndQuery) || /[?&]itag=(139|140|141|249|250|251)(?:&|$)/i.test(pathAndQuery)) {
+        audios.add(value); return;
+      }
+      if (/\.(mp4|m4v|webm|mov|m3u8)(?:$|[?#])/i.test(pathAndQuery) || /[?&](mime|type)=video/i.test(pathAndQuery)) {
+        videos.add(value); return;
+      }
+      if (/\.(jpg|jpeg|png|webp|gif|avif)(?:$|[?#])/i.test(pathAndQuery)) {
+        images.add(value); return;
+      }
+
+      if (audioKey.test(keyLower) && !imageKey.test(keyLower) && !videoKey.test(keyLower)) audios.add(value);
+      else if (imageKey.test(keyLower)) images.add(value);
+      else if (videoKey.test(keyLower)) videos.add(value);
+      return;
+    }
+    if (Array.isArray(value)) {
+      for (const item of value) walk(item, key, depth + 1);
+      return;
+    }
+    if (typeof value === 'object') {
+      for (const [childKey, childValue] of Object.entries(value)) walk(childValue, childKey, depth + 1);
+    }
+  }
+  walk(obj);
+  return { videos: [...videos], audios: [...audios], images: [...images] };
+}
+
+function findMeta(obj, key) {
+  if (!obj) return '';
+  if (typeof obj !== 'object') return '';
+  if (typeof obj[key] === 'string') return obj[key];
+  for (const v of Object.values(obj)) {
+    const r = findMeta(v, key);
+    if (r) return r;
+  }
+  return '';
+}
+
+// Collect URLs from common provider response fields when URLs have no file extension.
+function collectCandidateUrls(obj) {
+  const found = new Set();
+  function walk(value, key = '', depth = 0) {
+    if (value == null || depth > 14) return;
+    if (typeof value === 'string') {
+      if (!/^https?:\/\//i.test(value)) return;
+      const k = String(key).toLowerCase();
+      if (/(^|_)(url|uri|link|download|downloadurl|download_url|media|src|play|playurl|play_url|video|audio|music|image|photo|file)($|_)/i.test(k)) found.add(value);
+      return;
+    }
+    if (Array.isArray(value)) { for (const item of value) walk(item, key, depth + 1); return; }
+    if (typeof value === 'object') { for (const [k, v] of Object.entries(value)) walk(v, k, depth + 1); }
+  }
+  walk(obj);
+  return [...found];
+}
+
+function classifyFallbackUrls(raw, platform, format) {
+  const candidates = collectCandidateUrls(raw);
+  if (!candidates.length) return { videos: [], audios: [], images: [] };
+  const media = { videos: [], audios: [], images: [] };
+  const audioPlatforms = new Set(['spotify', 'soundcloud']);
+  const imagePlatforms = new Set(['pinterest', 'xiaohongshu']);
+  const target = format === 'audio' || (!format && audioPlatforms.has(platform)) ? 'audios'
+    : format === 'image' ? 'images'
+    : imagePlatforms.has(platform) && candidates.every(u => /\.(jpg|jpeg|png|webp)(?:[?#]|$)/i.test(u)) ? 'images'
+    : 'videos';
+  media[target] = candidates;
+  return media;
+}
+
+// ---------- YOUTUBE FALLBACK ----------
+async function youtubeFallback(url) {
+  try {
+    const r = await fetch('https://api.cobalt.tools/api/json', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+        'User-Agent': 'Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36'
+      },
+      body: JSON.stringify({ url, vQuality: '720', isAudioOnly: false, disableMetadata: false })
+    });
+    if (r.ok) {
+      const j = await r.json();
+      if (j.status !== 'error' && j.url) {
+        return { status: true, title: j.filename || '', video: j.url, _source: 'cobalt' };
+      }
+    }
+  } catch (e) {
+    console.warn('[yt-fallback] cobalt error:', e.message);
+  }
+  return null;
+}
+
+// ---------- HANDLER ----------
+async function handler(req, res) {
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  if (req.method === 'OPTIONS') return res.status(204).end();
+
+  const { url, format, debug, probe } = req.query || {};
+  if (probe === '1') return res.status(200).json({ ok: true, service: 'aio-downloader-api' });
+  if (req.query?.health === '1') {
+    const handlers = Object.fromEntries(Object.entries(HANDLERS).map(([name, fn]) => [name, typeof fn === 'function']));
+    return res.status(200).json({ ok: Object.values(handlers).some(Boolean), service: 'aio-downloader-api', handlers, missing: Object.keys(handlers).filter(name => !handlers[name]) });
+  }
+  if (!url) return res.status(400).json({ error: 'Parameter url wajib diisi' });
+  if (typeof url !== 'string' || url.length > 4096) return res.status(400).json({ error: 'URL tidak valid atau terlalu panjang' });
+  try {
+    const parsedUrl = new URL(url);
+    if (!['http:', 'https:'].includes(parsedUrl.protocol)) throw new Error('protocol');
+  } catch {
+    return res.status(400).json({ error: 'Masukkan URL lengkap yang valid (https://...)' });
+  }
+  if (format && !['video', 'audio', 'image'].includes(format)) {
+    return res.status(400).json({ error: 'Format harus video, audio, atau image' });
+  }
+
+  const platform = detectPlatform(url);
+  if (!platform) return res.status(400).json({ error: 'Platform belum didukung' });
+
+  const fn = HANDLERS[platform];
+  if (typeof fn !== 'function') return res.status(501).json({ error: `Handler untuk ${platform} tidak tersedia pada versi btch-downloader yang terpasang`, platform });
+
+  try {
+    console.log(`[aio] ${platform}: ${url}`);
+    let raw = await Promise.race([
+      Promise.resolve().then(() => fn(url)),
+      new Promise((_, reject) => setTimeout(() => reject(new Error('Provider terlalu lama merespons (timeout 25 detik). Coba lagi nanti.')), 25000))
+    ]);
+
+    if (debug === '1') {
+      return res.status(200).json({ ok: true, platform, raw });
+    }
+
+    const rawEmpty = !raw || raw.status === false || Object.keys(raw).length === 0;
+    const mediaCheck = raw ? extractMedia(raw) : { videos: [], audios: [], images: [] };
+    const noMedia = mediaCheck.videos.length === 0 && mediaCheck.audios.length === 0 && mediaCheck.images.length === 0;
+
+    if ((rawEmpty || noMedia) && platform === 'youtube') {
+      console.log('[aio] youtube primary gagal, coba fallback cobalt...');
+      const fb = await youtubeFallback(url);
+      if (fb) raw = fb;
+    }
+
+    if (!raw || raw.status === false) {
+      throw new Error(raw?.message || 'Provider gagal memproses link');
+    }
+
+    let media = extractMedia(raw);
+
+    // Fallback trigger: kalau bucket yang DIMINTA kosong, atau semua bucket kosong.
+    const needVideo = !format || format === 'video';
+    const needAudio = format === 'audio';
+    const needImage = format === 'image';
+    const requestedEmpty =
+      (needVideo && media.videos.length === 0) ||
+      (needAudio && media.audios.length === 0) ||
+      (needImage && media.images.length === 0);
+    const allEmpty = !media.videos.length && !media.audios.length && !media.images.length;
+
+    if (requestedEmpty || allEmpty) {
+      const extra = classifyFallbackUrls(raw, platform, format);
+      for (const v of extra.videos) if (!media.videos.includes(v)) media.videos.push(v);
+      for (const a of extra.audios) if (!media.audios.includes(a)) media.audios.push(a);
+      for (const i of extra.images) if (!media.images.includes(i)) media.images.push(i);
+    }
+
+    if (!media.videos.length && !media.audios.length && !media.images.length) {
+      const exports = Object.keys(lib).sort();
+      throw new Error(`Provider ${platform} tidak mengembalikan URL media yang dikenali. Export tersedia: ${exports.slice(0, 35).join(', ')}`);
+    }
+
+    let primary = null;
+    if (format === 'audio') primary = media.audios[0] || null;
+    else if (format === 'image') primary = media.images[0] || null;
+    else primary = media.videos[0] || null;
+
+    if (!primary) {
+      const requested = format || 'video';
+      throw new Error(`Media format ${requested} tidak tersedia. Video: ${media.videos.length}, audio: ${media.audios.length}, gambar: ${media.images.length}.`);
+    }
+
+    const title = findMeta(raw, 'title') || findMeta(raw, 'desc') || findMeta(raw, 'caption') || '';
+    const author = findMeta(raw, 'author') || findMeta(raw, 'username') || findMeta(raw, 'nickname') || findMeta(raw, 'unique_id') || '';
+
+    return res.status(200).json({
+      ok: true,
+      platform,
+      requested_format: format || 'video',
+      primary_url: primary,
+      title,
+      author,
+      thumbnail: media.images[0] || '',
+      media,
+      counts: {
+        videos: media.videos.length,
+        audios: media.audios.length,
+        images: media.images.length,
+      }
+    });
+  } catch (e) {
+    console.error(`[aio] ${platform} error:`, e.message);
+    return res.status(500).json({ error: e.message || 'Gagal memproses link', platform });
+  }
+}
+
+module.exports = handler;
+module.exports.detectPlatform = detectPlatform;
