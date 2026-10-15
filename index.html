@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#05030c">
+<title>AIO Downloader — Semua Platform</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<div class="aurora"></div>
+
+<div class="container">
+  <header class="header">
+    <div class="logo">
+      <div class="logo-mark">AIO</div>
+      <div>
+        <h1>AIO <span style="color:#b84cff">Downloader</span></h1>
+        <p class="subtitle">All-In-One Downloader by DennCode</p>
+      </div>
+    </div>
+    <button class="theme-btn" id="themeBtn" aria-label="Tema">🌙</button>
+  </header>
+
+  <main class="card">
+    <div class="card-header">
+      <span class="badge" id="detectBadge"><i class="fas fa-wand-magic-sparkles"></i> Download dari berbagai platform</span>
+    </div>
+
+    <div class="input-wrap">
+      <i class="fas fa-link input-icon"></i>
+      <input
+        type="url"
+        id="urlInput"
+        placeholder="Tempel URL di sini..."
+        autocomplete="off"
+        spellcheck="false"
+      />
+      <button class="paste-btn" id="pasteBtn" title="Tempel dari clipboard">
+        <i class="fas fa-paste"></i>
+      </button>
+    </div>
+
+    <div class="platform-info" id="platformInfo" hidden>
+      <div class="platform-icon" id="platformIcon"></div>
+      <div class="platform-text">
+        <div class="platform-name" id="platformName">Terdeteksi</div>
+        <div class="platform-sub" id="platformSub">Platform dikenali otomatis</div>
+      </div>
+    </div>
+
+    <div class="format-tabs" id="formatTabs">
+      <button class="format-tab active" data-format="video">
+        <i class="fas fa-video"></i> Video
+      </button>
+      <button class="format-tab" data-format="audio">
+        <i class="fas fa-music"></i> Audio
+      </button>
+      <button class="format-tab" data-format="image">
+        <i class="fas fa-image"></i> Gambar
+      </button>
+    </div>
+
+    <button class="download-btn" id="downloadBtn">
+      <i class="fas fa-download"></i><span id="btnText">Download</span>
+      <div class="spinner" id="spinner" hidden></div>
+    </button>
+
+    <div class="message" id="message" hidden></div>
+
+    <div class="result" id="result" hidden>
+      <div class="result-header">
+        <i class="fas fa-check-circle"></i>
+        <span>Siap diunduh</span>
+      </div>
+      <div class="preview" id="preview"></div>
+      <div class="meta" id="meta"></div>
+      <div class="result-actions">
+        <button class="save-btn" id="saveBtn">
+          <i class="fas fa-download"></i> Simpan File
+        </button>
+        <button class="reset-btn" id="resetBtn">
+          <i class="fas fa-redo"></i> Baru
+        </button>
+      </div>
+    </div>
+  </main>
+
+  <aside class="platform-panel" aria-label="Platform yang didukung">
+    <section class="platform-box">
+      <h2><span class="live-dot"></span> Platform Didukung</h2>
+      <div class="platform-grid">
+        <div><i class="fab fa-tiktok"></i><span>TikTok</span></div>
+        <div><i class="fab fa-instagram"></i><span>Instagram</span></div>
+        <div><i class="fab fa-youtube"></i><span>YouTube</span></div>
+        <div><i class="fab fa-x-twitter"></i><span>X (Twitter)</span></div>
+        <div><i class="fab fa-facebook-f"></i><span>Facebook</span></div>
+        <div><i class="fab fa-pinterest-p"></i><span>Pinterest</span></div>
+        <div><i class="fab fa-spotify"></i><span>Spotify</span></div>
+        <div><i class="fab fa-soundcloud"></i><span>SoundCloud</span></div>
+        <div><i class="fas fa-at"></i><span>Threads</span></div>
+        <div><i class="fas fa-film"></i><span>CapCut</span></div>
+        <div><i class="fab fa-google-drive"></i><span>Google Drive</span></div>
+        <div><i class="fas fa-music"></i><span>Douyin</span></div>
+        <div><i class="fas fa-image"></i><span>Xiaohongshu</span></div>
+        <div><i class="fas fa-play-circle"></i><span>SnackVideo</span></div>
+        <div><i class="fas fa-robot"></i><span>Cocofun</span></div>
+        <div><i class="fas fa-clone"></i><span>Kuaishou</span></div>
+      </div>
+    </section>
+    <section class="platform-box highlights">
+      <h2>Fitur Unggulan</h2>
+      <ul>
+        <li><i class="fas fa-check"></i> Mendukung 16+ platform populer</li>
+        <li><i class="fas fa-check"></i> Deteksi platform otomatis</li>
+        <li><i class="fas fa-check"></i> Pilihan format video, audio, gambar</li>
+        <li><i class="fas fa-check"></i> Preview sebelum download</li>
+        <li><i class="fas fa-check"></i> Tampilan responsif untuk HP</li>
+      </ul>
+      <div class="promo-note"><i class="fas fa-bolt"></i><span>Download yang kamu butuhkan, dalam satu tempat!</span></div>
+    </section>
+  </aside>
+
+  <section class="features">
+    <div class="feature">
+      <i class="fas fa-bolt"></i>
+      <div>
+        <strong>Cepat</strong>
+        <span>Serverless, langsung proses</span>
+      </div>
+    </div>
+    <div class="feature">
+      <i class="fas fa-shield-alt"></i>
+      <div>
+        <strong>Tanpa Login</strong>
+        <span>Cukup tempel link</span>
+      </div>
+    </div>
+    <div class="feature">
+      <i class="fas fa-mobile-alt"></i>
+      <div>
+        <strong>Semua Perangkat</strong>
+        <span>HP, tablet, desktop</span>
+      </div>
+    </div>
+  </section>
+
+  <footer>
+    <p>AIO Downloader&nbsp; · &nbsp;All-In-One Downloader by DennCode</p>
+    <p class="footer-sub">16 platform · btch-downloader</p>
+  </footer>
+</div>
+
+<script src="script.js"></script>
+</body>
+</html>

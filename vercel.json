@@ -1,0 +1,15 @@
+{
+  "version": 2,
+  "builds": [
+    { "src": "api/aio.js", "use": "@vercel/node" },
+    { "src": "api/dl.js", "use": "@vercel/node" },
+    { "src": "index.html", "use": "@vercel/static" },
+    { "src": "style.css", "use": "@vercel/static" },
+    { "src": "script.js", "use": "@vercel/static" }
+  ],
+  "routes": [
+    { "src": "/api/aio", "dest": "api/aio.js" },
+    { "src": "/api/dl", "dest": "api/dl.js" },
+    { "src": "/(.*)", "dest": "/$1" }
+  ]
+}
